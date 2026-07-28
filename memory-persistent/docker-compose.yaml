@@ -1,0 +1,49 @@
+version: "3.9"
+
+services:
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+
+    ports:
+      - "11434:11434"
+
+    volumes:
+      - ollama_data:/root/.ollama
+
+    restart: unless-stopped
+
+
+  agent:
+    build: .
+
+    container_name: ai-agent
+
+    depends_on:
+      - ollama
+
+    ports:
+      - "8501:8501"
+
+    environment:
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: qwen3:8b
+
+    volumes:
+      # Your application source code
+      - .:/app
+
+      # Persistent SQLite memory
+      - agent_memory:/data
+
+    restart: unless-stopped
+
+
+volumes:
+
+  # Ollama models persist here
+  ollama_data:
+
+  # Agent SQLite database persists here
+  agent_memory:
