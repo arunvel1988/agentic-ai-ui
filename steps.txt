@@ -5,3 +5,36 @@ docker exec -it ollama ollama pull qwen3:8b
 docker exec -it ollama ollama list
 
 docker compose up --build
+
+####################################################################################
+
+curl http://localhost:11434/api/generate \
+-d '{
+  "model":"qwen3:8b",
+  "prompt":"Say Hello",
+  "stream":false
+}'
+
+#####################################################################
+
+
+docker exec -it ai-agent sh
+
+#####################################################################
+nano cli.py
+
+
+
+from agent import agent
+
+while True:
+
+    q = input("\nYou : ")
+
+    if q.lower() == "exit":
+        break
+
+    print("\nAgent:")
+    print(agent.ask(q))
+
+#############################################################################
