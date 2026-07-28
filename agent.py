@@ -2,11 +2,12 @@
 agent.py
 ---------
 
-Simple AI Agent Runtime
+Simple AI Agent Runtime with Memory
 """
 
 from models import llm
 from tools import TOOLS
+from memory import memory
 
 
 SYSTEM_PROMPT = """
@@ -22,13 +23,18 @@ You have access to these tools:
 6. disk_usage
 7. running_processes
 8. list_directory
+9. read_file
+10. write_file
+11. execute_command
 
-If a tool is needed, reply EXACTLY in this format:
+-------------------------------------------------------
+
+If a tool is needed, reply ONLY in this format.
 
 TOOL:<tool_name>
 INPUT:<tool_input>
 
-Examples:
+Examples
 
 User:
 What time is it?
@@ -37,19 +43,21 @@ Assistant:
 TOOL:get_current_time
 INPUT:
 
--------------------------
+----------------------------
 
 User:
-Calculate 56 * 78
+Calculate 45 * 89
 
 Assistant:
 TOOL:calculate
-INPUT:56 * 78
+INPUT:45 * 89
 
--------------------------
+----------------------------
 
-If no tool is needed,
-answer normally.
+If no tool is required,
+answer the question normally.
+
+Do NOT explain why you selected a tool.
 """
 
 
@@ -60,8 +68,18 @@ class Agent:
 
     def ask(self, user_message):
 
+        # -----------------------------------------
+        # Load previous conversation
+        # -----------------------------------------
+
+        history = memory.history()
+
         prompt = f"""
 {SYSTEM_PROMPT}
+
+Previous Conversation
+
+{history}
 
 User:
 {user_message}
@@ -69,15 +87,19 @@ User:
 Assistant:
 """
 
+        # -----------------------------------------
+        # Ask LLM
+        # -----------------------------------------
+
         response = llm.generate(prompt)
 
-        print("LLM RESPONSE")
+        print("\n========== LLM ==========")
         print(response)
-        print("-" * 50)
+        print("=========================\n")
 
-        # ------------------------------------------------
-        # Did the LLM request a tool?
-        # ------------------------------------------------
+        # -----------------------------------------
+        # Tool Calling
+        # -----------------------------------------
 
         if response.startswith("TOOL:"):
 
@@ -89,6 +111,9 @@ Assistant:
 
             if len(lines) > 1 and lines[1].startswith("INPUT:"):
                 tool_input = lines[1].replace("INPUT:", "").strip()
+
+            print(f"Executing Tool : {tool_name}")
+            print(f"Tool Input     : {tool_input}")
 
             if tool_name not in TOOLS:
                 return f"Unknown Tool: {tool_name}"
@@ -105,29 +130,51 @@ Assistant:
             except Exception as ex:
                 return str(ex)
 
-            # ---------------------------------------------
-            # Ask LLM to create final answer
-            # ---------------------------------------------
+            print("\n========== TOOL RESULT ==========")
+            print(result)
+            print("=================================\n")
+
+            # -----------------------------------------
+            # Ask LLM to generate final response
+            # -----------------------------------------
 
             final_prompt = f"""
-User asked:
+You are an AI Assistant.
+
+Previous Conversation
+
+{history}
+
+User Question
 
 {user_message}
 
-Tool Used:
+Tool Used
 
 {tool_name}
 
-Tool Result:
+Tool Output
 
 {result}
 
-Give a friendly answer.
+Generate a helpful final response for the user.
 """
 
-            return llm.generate(final_prompt)
+            final_answer = llm.generate(final_prompt)
 
-        # ------------------------------------------------
+            # Save conversation
+
+            memory.add_user(user_message)
+            memory.add_assistant(final_answer)
+
+            return final_answer
+
+        # -----------------------------------------
+        # Normal Response
+        # -----------------------------------------
+
+        memory.add_user(user_message)
+        memory.add_assistant(response)
 
         return response
 
