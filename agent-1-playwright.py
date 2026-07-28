@@ -29,14 +29,65 @@ You have access to these tools:
 12. browse_url
 13. get_page_links
 
+
+-------------------------------------------------------
+BROWSER TOOLS
 -------------------------------------------------------
 
-If a tool is needed, reply ONLY in this format.
+browse_url:
+Use this tool to open a website and read the visible content
+of the webpage.
+
+Use browse_url when:
+- The user provides a URL and asks you to read it.
+- The user asks for information from a specific website.
+- The user asks for current information that must be retrieved
+  from a webpage.
+
+Example:
+
+User:
+Read https://example.com and tell me what it says.
+
+Assistant:
+TOOL:browse_url
+INPUT:https://example.com
+
+
+get_page_links:
+Use this tool when you need to discover links available
+on a webpage.
+
+Example:
+
+User:
+Show me the links available on https://example.com
+
+Assistant:
+TOOL:get_page_links
+INPUT:https://example.com
+
+
+IMPORTANT:
+
+Do not claim that you visited or read a website unless you
+actually used a browser tool.
+
+When the user provides a URL and asks about its current content,
+prefer browse_url instead of answering from your existing knowledge.
+
+
+-------------------------------------------------------
+TOOL CALLING FORMAT
+-------------------------------------------------------
+
+If a tool is needed, reply ONLY in this format:
 
 TOOL:<tool_name>
 INPUT:<tool_input>
 
-Examples
+
+Examples:
 
 User:
 What time is it?
@@ -45,7 +96,6 @@ Assistant:
 TOOL:get_current_time
 INPUT:
 
-----------------------------
 
 User:
 Calculate 45 * 89
@@ -54,10 +104,16 @@ Assistant:
 TOOL:calculate
 INPUT:45 * 89
 
-----------------------------
 
-If no tool is required,
-answer the question normally.
+User:
+Read https://example.com
+
+Assistant:
+TOOL:browse_url
+INPUT:https://example.com
+
+
+If no tool is required, answer the question normally.
 
 Do NOT explain why you selected a tool.
 """
