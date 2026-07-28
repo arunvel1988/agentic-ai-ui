@@ -1,0 +1,130 @@
+#########
+3. Update agent.py
+############################################################
+At the beginning of your ask() function, you currently have:
+
+history = memory.history()
+######################################################################
+Change it to:
+
+history = memory.history()
+
+relevant_memory = memory.relevant_memory(
+    user_message
+)
+###############################################################################
+Then change your main prompt from:
+
+prompt = f"""
+{SYSTEM_PROMPT}
+
+Previous Conversation
+
+{history}
+
+User:
+{user_message}
+
+Assistant:
+"""
+
+to:
+
+prompt = f"""
+{SYSTEM_PROMPT}
+
+Previous Conversation:
+
+{history}
+
+Relevant Long-Term Memory:
+
+{relevant_memory}
+
+User:
+{user_message}
+
+Assistant:
+"""
+###################################################################################
+Now Qwen gets both:
+
+Recent conversation
++
+Relevant old memories
+4. Decide what should be remembered
+
+For the first version, I recommend letting Qwen classify the message.
+
+Add this method inside your Agent class:
+
+def should_remember(self, user_message):
+
+    prompt = f"""
+You are a memory manager for an AI agent.
+
+Decide whether the following information would be useful
+in future conversations.
+
+Remember durable information such as:
+
+- names
+- preferences
+- project information
+- server names
+- environments
+- infrastructure information
+- recurring requirements
+- important decisions
+- long-term goals
+
+Do NOT remember:
+
+- greetings
+- thanks
+- temporary questions
+- calculations
+- one-time commands
+- casual conversation
+
+User message:
+
+{user_message}
+
+Respond ONLY:
+
+YES
+
+or
+
+NO
+"""
+
+    response = llm.generate(prompt)
+
+    return response.strip().upper().startswith("YES")
+
+Then inside ask():
+
+if self.should_remember(user_message):
+
+    memory.add_memory(
+        user_message
+    )
+
+Put this near the beginning:
+
+def ask(self, user_message):
+
+    history = memory.history()
+
+    relevant_memory = memory.relevant_memory(
+        user_message
+    )
+
+    if self.should_remember(user_message):
+        memory.add_memory(user_message)
+
+    ...
+
+    ###################################################################################
