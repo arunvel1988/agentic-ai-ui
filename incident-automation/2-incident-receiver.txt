@@ -1,5 +1,19 @@
-cd ~/devops-ai-agent
+
+sudo apt update
+sudo apt install python3-venv -y
+
 source venv/bin/activate
+
+mkdir agent-evaluation
+cd agent-evaluation
+
+
+python3 -m venv venv
+
+
+source venv/bin/activate
+
+
 ############################################################
 pip install flask
 ##################################################
