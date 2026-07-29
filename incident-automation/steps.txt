@@ -1,3 +1,4 @@
+#######################################################################
 services:
 
   ollama:
@@ -45,13 +46,13 @@ services:
 volumes:
   ollama_data:
 
-
+#######################################################################
 
 
 
 mkdir -p prometheus alertmanager
 
-
+#######################################################################
 
 nano prometheus/prometheus.yml
 
@@ -75,7 +76,7 @@ alerting:
         - targets:
             - "alertmanager:9093"
 
-
+#######################################################################
 
 
 nano prometheus/alerts.yml
@@ -107,7 +108,7 @@ groups:
 
 
 
-
+#######################################################################
 nano alertmanager/alertmanager.yml
 
 
@@ -120,7 +121,7 @@ receivers:
   - name: devops-agent
 
 
-
+#######################################################################
 
 docker-compose up -d ollama
 
@@ -129,11 +130,11 @@ docker exec -it ollama ollama pull qwen3:8b
 docker exec -it ollama ollama list
 
 docker-compose up -d
-
+#######################################################################
 curl localhost:9100/metrics | head
 
 sudo apt update
 sudo apt install stress-ng -y
 
 stress-ng --cpu $(nproc) --timeout 120s
-
+#######################################################################
