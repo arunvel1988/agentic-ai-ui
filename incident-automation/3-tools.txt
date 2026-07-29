@@ -1,0 +1,74 @@
+##############################################################
+
+pip install psutil
+
+nano app/incidents/tools.py
+
+
+import psutil
+import time
+from langchain_core.tools import tool
+
+
+@tool
+def check_cpu() -> str:
+    """Check the current CPU usage of the server."""
+
+    cpu = psutil.cpu_percent(interval=1)
+
+    return f"Current CPU usage is {cpu}%"
+
+
+@tool
+def check_top_processes() -> str:
+    """Find which processes are consuming the most CPU."""
+
+    processes = []
+
+    # First sample
+    for process in psutil.process_iter():
+        try:
+            process.cpu_percent(None)
+        except:
+            pass
+
+    time.sleep(1)
+
+    # Second sample
+    for process in psutil.process_iter(["pid", "name"]):
+        try:
+
+            cpu = process.cpu_percent(None)
+
+            processes.append(
+                {
+                    "pid": process.pid,
+                    "name": process.info["name"],
+                    "cpu": cpu
+                }
+            )
+
+        except:
+            continue
+
+    processes.sort(
+        key=lambda x: x["cpu"],
+        reverse=True
+    )
+
+    output = []
+
+    for process in processes[:5]:
+
+        output.append(
+            f"PID={process['pid']} "
+            f"Process={process['name']} "
+            f"CPU={process['cpu']}%"
+        )
+
+    return "\n".join(output)
+
+    #########################################################################################
+
+
+    
