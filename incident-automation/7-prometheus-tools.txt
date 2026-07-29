@@ -1,0 +1,106 @@
+##################################################################################
+
+pip install requests
+nano prometheus_tools.py
+
+import requests
+
+from datetime import datetime, timedelta
+from langchain_core.tools import tool
+
+
+PROMETHEUS_URL = "http://localhost:9090"
+
+
+@tool
+def check_cpu_history(incident_time: str) -> str:
+    """
+    Check historical CPU utilization from Prometheus around
+    the time an incident occurred.
+
+    incident_time should be an ISO timestamp.
+    """
+
+    try:
+        incident_dt = datetime.fromisoformat(incident_time)
+
+        # Look 3 minutes before and after incident
+        start = incident_dt - timedelta(minutes=3)
+        end = incident_dt + timedelta(minutes=3)
+
+        query = """
+        100 - (
+          avg by(instance) (
+            rate(node_cpu_seconds_total{mode="idle"}[1m])
+          ) * 100
+        )
+        """
+
+        response = requests.get(
+            f"{PROMETHEUS_URL}/api/v1/query_range",
+            params={
+                "query": query,
+                "start": start.timestamp(),
+                "end": end.timestamp(),
+                "step": "15s"
+            },
+            timeout=10
+        )
+
+        response.raise_for_status()
+
+        result = response.json()["data"]["result"]
+
+        if not result:
+            return "No historical CPU data found in Prometheus."
+
+        output = []
+
+        for series in result:
+
+            instance = series["metric"].get(
+                "instance",
+                "unknown"
+            )
+
+            output.append(
+                f"Instance: {instance}"
+            )
+
+            for timestamp, value in series["values"]:
+
+                timestamp = datetime.fromtimestamp(
+                    timestamp
+                ).strftime("%Y-%m-%d %H:%M:%S")
+
+                output.append(
+                    f"{timestamp} -> {float(value):.2f}% CPU"
+                )
+
+        return "\n".join(output)
+
+    except Exception as error:
+
+        return f"Prometheus query failed: {error}"
+
+        #######################################################################################
+
+        2. Only update investigator.py
+
+Add one new import:
+
+from prometheus_tools import check_cpu_history
+
+Then your agent's tools become:
+
+tools = [
+    check_cpu,
+    check_top_processes,
+    check_cpu_history
+]
+
+########################################################################
+
+
+
+  
