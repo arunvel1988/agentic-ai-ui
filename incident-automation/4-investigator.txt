@@ -1,0 +1,293 @@
+########################################################################
+
+nano app/incidents/investigator.py
+
+
+from langchain_ollama import ChatOllama
+from langchain.agents import create_agent
+
+from tools import (
+    check_cpu,
+    check_top_processes
+)
+
+
+# -------------------------------------------------
+# 1. LLM - Brain of our agent
+# -------------------------------------------------
+
+llm = ChatOllama(
+    model="qwen2.5:3b",
+    base_url="http://localhost:11434",
+    temperature=0
+)
+
+
+# -------------------------------------------------
+# 2. Tools available to the agent
+# -------------------------------------------------
+
+tools = [
+    check_cpu,
+    check_top_processes
+]
+
+
+# -------------------------------------------------
+# 3. Create DevOps investigation agent
+# -------------------------------------------------
+
+agent = create_agent(
+    model=llm,
+
+    tools=tools,
+
+    system_prompt="""
+You are an autonomous DevOps Incident Investigation Agent.
+
+You receive infrastructure incidents automatically.
+
+Your responsibility is to investigate the incident and determine
+the probable root cause.
+
+IMPORTANT:
+
+First understand the incident.
+
+Then create an investigation plan.
+
+Decide which available tools are required.
+
+Execute the appropriate tools.
+
+Analyze the returned evidence.
+
+If the evidence is insufficient, use additional available tools.
+
+Never invent infrastructure information.
+
+Do not perform remediation.
+
+At the end provide:
+
+INVESTIGATION PLAN:
+- What you decided to investigate
+
+OBSERVATIONS:
+- What you actually discovered from tools
+
+PROBABLE ROOT CAUSE:
+- Most likely cause based on evidence
+
+RECOMMENDED ACTION:
+- What the DevOps engineer should do
+"""
+)
+
+
+# -------------------------------------------------
+# 4. Function called automatically by receiver.py
+# -------------------------------------------------
+
+def investigate(incident):
+
+    print("\n======================================")
+    print("DEVOPS AI AGENT STARTED")
+    print("======================================")
+
+    print(f"Incident : {incident['incident_id']}")
+    print(f"Alert    : {incident['alert']}")
+    print(f"Severity : {incident['severity']}")
+    print(f"Instance : {incident['instance']}")
+
+    prompt = f"""
+A new infrastructure incident has occurred.
+
+Incident ID:
+{incident['incident_id']}
+
+Alert:
+{incident['alert']}
+
+Severity:
+{incident['severity']}
+
+Affected Instance:
+{incident['instance']}
+
+Description:
+{incident['description']}
+
+Investigate this incident.
+
+First determine an appropriate investigation plan.
+
+Then use the available tools to collect real evidence.
+
+Continue investigating until you have enough evidence to determine
+the probable root cause.
+
+Do not make up server information.
+"""
+
+    result = agent.invoke(
+        {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+        }
+    )
+
+    final_answer = result["messages"][-1].content
+
+    print("\n======================================")
+    print("AI INVESTIGATION COMPLETE")
+    print("======================================")
+
+    print(final_answer)
+
+    return final_answer
+
+
+##########################################################################
+
+pip install -U flask psutil langchain langchain-ollama
+nano receiver.py
+
+
+from flask import Flask, request, jsonify
+from datetime import datetime
+import uuid
+import json
+
+# Import our AI investigator
+from investigator import investigate
+
+
+app = Flask(__name__)
+
+
+@app.route("/alert", methods=["POST"])
+def receive_alert():
+
+    # Alertmanager sends JSON
+    payload = request.json
+
+    print("\nAlert received from Alertmanager")
+
+
+    # There may be multiple alerts
+    for alert in payload.get("alerts", []):
+
+        # Ignore resolved alerts
+        if alert.get("status") != "firing":
+            continue
+
+
+        labels = alert.get("labels", {})
+        annotations = alert.get("annotations", {})
+
+
+        # -----------------------------
+        # CREATE INCIDENT
+        # -----------------------------
+
+        incident = {
+
+            "incident_id":
+                "INC-" + str(uuid.uuid4())[:8].upper(),
+
+            "status":
+                "OPEN",
+
+            "created_at":
+                datetime.now().isoformat(),
+
+            "alert":
+                labels.get("alertname"),
+
+            "severity":
+                labels.get("severity"),
+
+            "instance":
+                labels.get("instance"),
+
+            "description":
+                annotations.get("description")
+        }
+
+
+        print("\n========== NEW INCIDENT ==========")
+
+        print(
+            json.dumps(
+                incident,
+                indent=2
+            )
+        )
+
+        print("==================================")
+
+
+        # ------------------------------------
+        # AUTOMATICALLY START AI AGENT
+        # ------------------------------------
+
+        print(
+            f"\nStarting AI investigation for "
+            f"{incident['incident_id']}..."
+        )
+
+
+        try:
+
+            investigation = investigate(incident)
+
+            incident["status"] = "INVESTIGATED"
+
+            incident["investigation"] = investigation
+
+
+            print("\n========== INCIDENT UPDATED ==========")
+
+            print(
+                json.dumps(
+                    incident,
+                    indent=2
+                )
+            )
+
+            print("=======================================")
+
+
+        except Exception as error:
+
+            incident["status"] = "INVESTIGATION_FAILED"
+
+            print("\nAI investigation failed:")
+
+            print(error)
+
+
+    return jsonify({
+        "status": "received"
+    }), 200
+
+
+if __name__ == "__main__":
+
+    app.run(
+        host="0.0.0.0",
+        port=5001
+    )
+
+
+    ###############################################################################
+
+
+    pip install -U flask psutil langchain langchain-ollama
+
+    
