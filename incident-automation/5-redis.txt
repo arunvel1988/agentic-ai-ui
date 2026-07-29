@@ -1,0 +1,119 @@
+###########################################################
+mkdir redis
+cd redis
+
+pip install redis
+###################################################################
+
+
+nano docker-compose.yml
+
+services:
+
+  redis:
+    image: redis:7-alpine
+    container_name: incident-redis
+
+    ports:
+      - "6379:6379"
+
+    volumes:
+      - redis_data:/data
+
+    command: redis-server --appendonly yes
+
+    restart: unless-stopped
+
+
+volumes:
+  redis_data:
+
+  ##########################################################
+
+  cd redis
+
+docker-compose up -d
+#
+###########################################################
+nano receiver.py
+
+from flask import Flask, request, jsonify
+from datetime import datetime
+import uuid
+import json
+import redis
+
+
+app = Flask(__name__)
+
+
+# Connect to Redis
+redis_client = redis.Redis(
+    host="localhost",
+    port=6379,
+    decode_responses=True
+)
+
+
+@app.route("/alert", methods=["POST"])
+def receive_alert():
+
+    payload = request.get_json()
+
+    print("\nAlert received from Alertmanager")
+
+    for alert in payload.get("alerts", []):
+
+        # Ignore resolved alerts
+        if alert.get("status") != "firing":
+            continue
+
+        labels = alert.get("labels", {})
+        annotations = alert.get("annotations", {})
+
+        # Create incident
+        incident = {
+            "incident_id": "INC-" + str(uuid.uuid4())[:8].upper(),
+            "status": "OPEN",
+            "created_at": datetime.now().isoformat(),
+            "alert": labels.get("alertname"),
+            "severity": labels.get("severity"),
+            "instance": labels.get("instance"),
+            "description": annotations.get("description")
+        }
+
+        print("\n========== NEW INCIDENT ==========")
+        print(json.dumps(incident, indent=2))
+        print("==================================")
+
+        # Publish incident into Redis Stream
+        message_id = redis_client.xadd(
+            "incidents",
+            {
+                "data": json.dumps(incident)
+            }
+        )
+
+        print(
+            f"\nIncident {incident['incident_id']} "
+            f"published to Redis"
+        )
+
+        print(f"Redis Message ID: {message_id}")
+
+    return jsonify({
+        "status": "received"
+    }), 200
+
+
+if __name__ == "__main__":
+
+    print("Incident Receiver started")
+    print("Waiting for Alertmanager...")
+
+    app.run(
+        host="0.0.0.0",
+        port=5001
+    )
+###########################################################
+
