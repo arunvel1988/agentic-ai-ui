@@ -1,0 +1,89 @@
+cd ~/devops-ai-agent
+source venv/bin/activate
+############################################################
+pip install flask
+##################################################
+
+mkdir -p app/incidents
+nano app/incidents/receiver.py
+###############################################################
+from flask import Flask, request, jsonify
+from datetime import datetime
+import uuid
+import json
+
+app = Flask(__name__)
+
+
+@app.route("/alert", methods=["POST"])
+def receive_alert():
+
+    payload = request.json
+
+    for alert in payload.get("alerts", []):
+
+        if alert.get("status") != "firing":
+            continue
+
+        labels = alert.get("labels", {})
+        annotations = alert.get("annotations", {})
+
+        incident = {
+            "incident_id": "INC-" + str(uuid.uuid4())[:8].upper(),
+            "status": "OPEN",
+            "created_at": datetime.now().isoformat(),
+            "alert": labels.get("alertname"),
+            "severity": labels.get("severity"),
+            "instance": labels.get("instance"),
+            "description": annotations.get("description")
+        }
+
+        print("\n========== NEW INCIDENT ==========")
+        print(json.dumps(incident, indent=2))
+        print("==================================\n")
+
+    return jsonify({"status": "received"}), 200
+
+
+app.run(
+    host="0.0.0.0",
+    port=5001
+)
+
+
+##################################################################
+
+python app/incidents/receiver.py
+#######################################
+
+
+nano alertmanager/alertmanager.yml
+
+
+global:
+
+route:
+  receiver: devops-agent
+  group_wait: 5s
+  group_interval: 10s
+  repeat_interval: 1h
+
+receivers:
+  - name: devops-agent
+    webhook_configs:
+      - url: "http://172.17.0.1:5001/alert"
+        send_resolved: true
+
+        #################################################################
+
+docker compose restart alertmanager
+
+#######################################################
+
+
+stress-ng --cpu $(nproc) --timeout 120s
+
+#############################################################
+
+
+
