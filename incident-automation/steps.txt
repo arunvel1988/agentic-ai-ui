@@ -120,7 +120,15 @@ receivers:
   - name: devops-agent
 
 
-docker compose up -d
+
+
+docker-compose up -d ollama
+
+docker exec -it ollama ollama pull qwen3:8b
+
+docker exec -it ollama ollama list
+
+docker-compose up -d
 
 curl localhost:9100/metrics | head
 
