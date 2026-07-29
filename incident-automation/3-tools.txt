@@ -1,8 +1,10 @@
 ##############################################################
 
+python3 -m venv venv
+source venv/bin/activate
 pip install psutil
-
-nano app/incidents/tools.py
+ mkdir -p app/incidents
+    nano app/incidents/tools.py
 
 
 import psutil
