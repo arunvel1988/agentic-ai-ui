@@ -1,0 +1,67 @@
+#############################################################
+cat > cpu_hog.py <<'EOF'
+import multiprocessing
+
+def work():
+    while True:
+        x = 999999 * 999999
+
+if __name__ == "__main__":
+    for _ in range(multiprocessing.cpu_count()):
+        multiprocessing.Process(target=work).start()
+EOF
+
+#######################################################################
+
+python3 -c 'import time; x=bytearray(4*1024*1024*1024); time.sleep(600)'
+###############################################################
+
+
+mkdir -p /tmp/devops-agent-test
+fallocate -l 2G /tmp/devops-agent-test/huge-application.log
+
+
+#######################################################
+
+rm -f /tmp/devops-agent-test/huge-application.log
+rmdir /tmp/devops-agent-test
+
+#########################################################
+
+sudo tee /etc/systemd/system/demo-agent.service > /dev/null <<'EOF'
+[Unit]
+Description=DevOps Agent Demo Service
+
+[Service]
+ExecStart=/bin/sleep infinity
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+########################################################
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now demo-agent
+
+##################################################################
+
+
+sudo systemctl stop demo-agent
+#################################################
+
+sudo sed -i 's|ExecStart=/bin/sleep infinity|ExecStart=/bin/false|' /etc/systemd/system/demo-agent.service
+sudo systemctl daemon-reload
+sudo systemctl restart demo-agent
+
+###################################################
+
+docker run -d \
+  --name devops-agent-demo \
+  nginx:alpine
+
+docker stop devops-agent-demo
+
+#######################################################
+
+docker rm -f devops-agent-demo
