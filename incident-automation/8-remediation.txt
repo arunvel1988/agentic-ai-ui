@@ -1,0 +1,65 @@
+##########################################################################################
+
+
+touch remediation.py
+
+
+############################
+
+
+import subprocess
+import time
+
+
+ALLOWED_ACTIONS = {
+    "terminate_stress_ng",
+}
+
+
+def terminate_stress_ng():
+    """
+    Gracefully terminate stress-ng processes.
+    """
+
+    result = subprocess.run(
+        ["pkill", "-TERM", "stress-ng"],
+        capture_output=True,
+        text=True
+    )
+
+    time.sleep(3)
+
+    # Check whether stress-ng still exists
+    check = subprocess.run(
+        ["pgrep", "-a", "stress-ng"],
+        capture_output=True,
+        text=True
+    )
+
+    if check.returncode == 1:
+        return {
+            "success": True,
+            "message": "stress-ng processes terminated successfully"
+        }
+
+    return {
+        "success": False,
+        "message": f"stress-ng still running:\n{check.stdout}"
+    }
+
+
+def execute_remediation(action):
+
+    if action not in ALLOWED_ACTIONS:
+        return {
+            "success": False,
+            "message": f"Action '{action}' is not allowed"
+        }
+
+    if action == "terminate_stress_ng":
+        return terminate_stress_ng()
+
+        ###############################################################################
+
+
+        
