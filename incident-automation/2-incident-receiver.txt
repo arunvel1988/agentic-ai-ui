@@ -97,6 +97,8 @@ docker compose restart alertmanager
 
 stress-ng --cpu $(nproc) --timeout 120s
 
+tress-ng --cpu $(nproc) --timeout 10m
+
 #############################################################
 
 
